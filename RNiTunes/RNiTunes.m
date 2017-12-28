@@ -7,6 +7,7 @@
 //
 
 #import "RNiTunes.h"
+#import <StoreKit/StoreKit.h>
 #import <MediaPlayer/MediaPlayer.h>
 #import <React/RCTConvert.h>
 
@@ -20,6 +21,28 @@
 }
 
 RCT_EXPORT_MODULE()
+
+RCT_EXPORT_METHOD(authorizePermission:(RCTResponseSenderBlock)successCallback) {
+    switch ([SKCloudServiceController authorizationStatus]) {
+        case SKCloudServiceAuthorizationStatusAuthorized:
+            successCallback(@[@YES]);
+            return;
+        case SKCloudServiceAuthorizationStatusDenied:
+            successCallback(@[@NO]);
+            return;
+        default:
+            break;
+    }
+    [SKCloudServiceController requestAuthorization:^(SKCloudServiceAuthorizationStatus status) {
+        switch (status) {
+            case SKCloudServiceAuthorizationStatusAuthorized:
+                successCallback(@[@YES]);
+                break;
+            default:
+                successCallback(@[@NO]);
+        }
+    }];
+}
 
 RCT_EXPORT_METHOD(getArtists:(NSDictionary *)params successCallback:(RCTResponseSenderBlock)successCallback) {
 
@@ -74,10 +97,10 @@ RCT_EXPORT_METHOD(getAlbums:(NSDictionary *)params successCallback:(RCTResponseS
 
 RCT_EXPORT_METHOD(getCurrentTrack: (RCTResponseSenderBlock)successCallback) {
     NSLog(@"%@ %@", NSStringFromClass([self class]), NSStringFromSelector(_cmd));
-    
+
     MPMusicPlayerController *musicPlayer = [MPMusicPlayerController applicationMusicPlayer];
     MPMediaItem *song = [musicPlayer nowPlayingItem];
-    
+
     NSString *title = [song valueForProperty: MPMediaItemPropertyTitle]; // filterable
     NSString *albumTitle = [song valueForProperty: MPMediaItemPropertyAlbumTitle]; // filterable
     NSString *albumArtist = [song valueForProperty: MPMediaItemPropertyAlbumArtist]; // filterable
@@ -94,13 +117,13 @@ RCT_EXPORT_METHOD(getCurrentTrack: (RCTResponseSenderBlock)successCallback) {
         // http://stackoverflow.com/a/510444/185771
         base64 = [NSString stringWithFormat:@"%@%@", @"data:image/jpeg;base64,", [self imageToNSString:image]];
     }
-    
+
     double currentPlaybackTime = (double) [musicPlayer currentPlaybackTime];
     NSNumber *currentPlayTime = [NSNumber numberWithInt:currentPlaybackTime];
-    
+
     NSDictionary *track = [NSDictionary dictionary];
     track = @{@"albumTitle":albumTitle, @"albumArtist": albumArtist, @"duration":[duration isKindOfClass:[NSString class]] ? [NSNumber numberWithInt:[duration intValue]] : duration, @"genre":genre, @"playCount": [NSNumber numberWithInt:[playCount intValue]], @"title": title, @"currentPlayTime": currentPlayTime, @"artwork": base64};
-    
+
     successCallback(@[[NSNull null], track]);
 }
 
@@ -501,10 +524,10 @@ RCT_EXPORT_METHOD(getPlaylists:(NSDictionary *)params successCallback:(RCTRespon
                 if (playCount == nil) {
                     playCount = @"0";
                 }
-                
+
                 songDictionary = @{@"albumTitle":albumTitle, @"albumArtist": albumArtist, @"duration":[duration isKindOfClass:[NSString class]] ? [NSNumber numberWithInt:[duration intValue]] : duration, @"genre":genre, @"playCount": [NSNumber numberWithInt:[playCount intValue]], @"title": title};
 
-                
+
                 [mutableSongsToSerialize addObject:songDictionary];
             }
         }
@@ -569,15 +592,15 @@ RCT_EXPORT_METHOD(playTrack:(NSDictionary *)trackItem callback:(RCTResponseSende
 
 RCT_EXPORT_METHOD(playTracks:(NSArray *)tracks successCallback:(RCTResponseSenderBlock)successCallback) {
     NSLog(@"%@ %@", NSStringFromClass([self class]), NSStringFromSelector(_cmd));
-    
+
     NSMutableArray *playlist = [[NSMutableArray alloc] initWithCapacity:0];
-    
+
     for(int i = 0; i < [tracks count]; i++) {
         NSDictionary *query = [tracks objectAtIndex: i];
-        
+
         MPMediaQuery *songsQuery = [MPMediaQuery songsQuery];
-        
-        
+
+
         if ([query objectForKey:@"title"] != nil) {
             NSString *searchTitle = [query objectForKey:@"title"];
             [songsQuery addFilterPredicate:[MPMediaPropertyPredicate predicateWithValue:searchTitle forProperty:MPMediaItemPropertyTitle comparisonType:MPMediaPredicateComparisonContains]];
@@ -586,27 +609,27 @@ RCT_EXPORT_METHOD(playTracks:(NSArray *)tracks successCallback:(RCTResponseSende
             NSString *searchalbumArtist = [query objectForKey:@"albumArtist"];
             [songsQuery addFilterPredicate:[MPMediaPropertyPredicate predicateWithValue:searchalbumArtist forProperty:MPMediaItemPropertyAlbumArtist comparisonType:MPMediaPredicateComparisonContains]];
         }
-        
+
         for (MPMediaItem *song in songsQuery.items) {
-            
+
             [playlist addObject: song];
-        
+
         }
     }
-    
+
     if (playlist.count == 0) {
         successCallback(@[@"Tracks have not been found"]);
         return;
     }
-    
+
     MPMusicPlayerController *musicPlayer = [MPMusicPlayerController applicationMusicPlayer];
     MPMediaItemCollection *currentQueue = [[MPMediaItemCollection alloc] initWithItems:playlist];
     MPMediaItem *nowPlaying = [[currentQueue items] objectAtIndex:0];
     [musicPlayer setQueueWithItemCollection:currentQueue];
     [musicPlayer setNowPlayingItem:nowPlaying];
-    
+
     [musicPlayer play];
-    
+
     successCallback(@[[NSNull null]]);
 }
 
@@ -618,19 +641,19 @@ RCT_EXPORT_METHOD(play) {
 
 RCT_EXPORT_METHOD(pause) {
     NSLog(@"%@ %@", NSStringFromClass([self class]), NSStringFromSelector(_cmd));
-    
+
     [[MPMusicPlayerController applicationMusicPlayer] pause];
 }
 
 RCT_EXPORT_METHOD(next) {
     NSLog(@"%@ %@", NSStringFromClass([self class]), NSStringFromSelector(_cmd));
-    
+
     [[MPMusicPlayerController applicationMusicPlayer] skipToNextItem];
 }
 
 RCT_EXPORT_METHOD(previous) {
     NSLog(@"%@ %@", NSStringFromClass([self class]), NSStringFromSelector(_cmd));
-    
+
     [[MPMusicPlayerController applicationMusicPlayer] skipToPreviousItem];
 }
 
@@ -640,7 +663,7 @@ RCT_EXPORT_METHOD(getCurrentPlayTime:(RCTResponseSenderBlock)callback) {
     MPMusicPlayerController *musicPlayer = [MPMusicPlayerController applicationMusicPlayer] ;
     double nowPlayingItemDuration = [[[musicPlayer nowPlayingItem] valueForProperty:MPMediaItemPropertyPlaybackDuration]doubleValue];
     double currentTime = (double) [musicPlayer currentPlaybackTime];
-    
+
     NSNumber *number = [NSNumber numberWithInt:currentTime] ;
     callback(@[number]);
 }

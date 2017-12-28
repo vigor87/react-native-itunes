@@ -3,6 +3,18 @@ var React = require("react-native");
 var { RNiTunes } = require("react-native").NativeModules;
 
 module.exports = {
+  authorize: function() {
+    return new Promise((resolve, reject) => {
+      RNiTunes.authorizePermission((res) => {
+        if (res) {
+          resolve();
+        } else {
+          reject();
+        }
+      });
+    })
+  },
+
   getPlaylists: function(params) {
     return new Promise(resolve => {
       RNiTunes.getPlaylists(params || {}, playlists => {
